@@ -1,6 +1,6 @@
 # EEPROM Multi-Page Variable with NvM Storage Stack
 
-**Embedded C | S32 Design Studio | I2C EEPROM (24C04) | NvM / MemIf / Ea | CRC16 | UART**
+**Embedded C | S32 Design Studio | I2C EEPROM (24C04) | NvM / MemIf / Ea | UART**
 
 A small embedded project that stores a **20-byte variable** in an external 24C04 EEPROM with **one API call**. The write is split into 8-byte page writes inside the driver, each page is confirmed by ACK polling, and the data is read back and compared. The value survives a reset: at start-up the program reads it back and prints it over UART, so every step can be watched in a terminal such as PuTTY.
 
@@ -13,12 +13,12 @@ A small embedded project that stores a **20-byte variable** in an external 24C04
 | 2 | Requirements and scope | Requirements R1 to R5 |
 | 3 | How it works | Flowchart and step-by-step logic |
 | 4 | EEPROM memory map | Addresses and block layout |
-| 5 | Status codes | OK, restored, integrity failed, errors |
+| 5 | Status codes | OK, not OK, pending, errors |
 | 6 | Hardware and software used | Board, EEPROM, tools |
 | 7 | Project structure | Folders and files |
 | 8 | Configuration | Macros, components, terminal settings |
 | 9 | How to build and run | Build, flash and test steps |
-| 10 | UART output & Test cases | TC1 to TC7 and verification status |
+| 10 | UART output & Test cases | TC1 to TC3 and verification status |
 | 11 | Code overview | Functions and messages |
 | 12 | Limitations and future work | Known gaps and improvements |
 | 13 | Author | Name, institution |
@@ -34,7 +34,6 @@ In this project:
 - After each page the driver waits until the EEPROM has finished its internal write cycle (ACK polling, with a limit).
 - The application reads the variable back and compares it with what was written.
 - On every boot the stored value is read and shown, so reset persistence can be seen.
-- Optional CRC16 and a ROM default value are available for other blocks (blocks 2 and 3).
 
 ## 2. Requirements and scope
 
@@ -88,12 +87,10 @@ Call chain: `main.c` → `NvM.c` → `MemIf.c` → `Ea.c` → `eeprom_ex2.c` →
 
 ## 4. EEPROM memory map
 
-| Block | NvM ID | Address | Size | CRC16 | RAM / ROM default | Purpose |
-|---|---:|---|---:|---|---|---|
-| Exercise 2 variable | 1 | 0x000 - 0x013 | 20 bytes | no | RAM block | The 20-byte variable used by `main.c` (pages 8, 8, 4) |
-| Unaligned test block | 2 | 0x045 - 0x05A | 22 bytes (20 + 2 CRC) | yes | RAM block, ROM default = zeros | Shows an unaligned write (3, 8, 8, 3 bytes) and restore from ROM |
-| Boundary test block | 3 | 0x0F8 - 0x10D | 22 bytes (20 + 2 CRC) | yes | none | Write across the 0x100 boundary (device address 0x50 then 0x51) |
-| Free | - | 0x10E - 0x1FF | 242 bytes | - | - | Unused |
+| Block | NvM ID | Address | Size | Purpose |
+|---|---:|---|---:|---|
+| Exercise 2 variable | 1 | 0x000 - 0x013 | 20 bytes | The 20-byte variable used by `main.c` (pages 8, 8, 4) |
+| Not used by the application | - | 0x014 - 0x1FF | 492 bytes | Free (two extra test blocks, IDs 2 and 3, are defined in `NvM_Cfg.c` / `Ea_Cfg.c` for the PC tests; `main.c` does not use them) |
 
 Total EEPROM: 512 bytes (0x000 - 0x1FF), 8-byte pages assumed. Block 1 sits at the same address and has the same format as the earlier raw-EEPROM version of this project, so data written by that version is still read correctly.
 
@@ -106,10 +103,8 @@ NvM request result (`NvM_GetErrorStatus`):
 | `NVM_REQ_OK` | 0 | Request finished successfully. |
 | `NVM_REQ_NOT_OK` | 1 | I2C or EEPROM error, or ACK timeout. |
 | `NVM_REQ_PENDING` | 2 | Request accepted, not finished yet. |
-| `NVM_REQ_INTEGRITY_FAILED` | 3 | CRC mismatch and no ROM default (block 3). |
-| `NVM_REQ_RESTORED_FROM_ROM` | 8 | CRC mismatch, ROM default copied to the destination (block 2). |
 
-Other result values are declared but not used.
+Other result values are declared in `NvM.h` but not used by the application.
 
 API return values and driver status:
 
@@ -149,10 +144,10 @@ PROJECT2_EEPROM_RESET_BLINK/
 │   ├── main.c            Application: LED, UART input, read / write / verify flow
 │   ├── eeprom_ex2.c/.h   EEPROM driver: page splitting, A8 select, ACK polling, read
 │   ├── Ea.c/.h           EEPROM abstraction: block address map, job execution
-│   ├── Ea_Cfg.c/.h       Ea block table (3 blocks)
+│   ├── Ea_Cfg.c/.h       Ea block table
 │   ├── MemIf.c/.h        Memory interface (device 0, forwards to Ea)
-│   ├── NvM.c/.h          NvM manager: queue, job state machine, CRC16
-│   ├── NvM_Cfg.c/.h      NvM block table, RAM block, ROM default
+│   ├── NvM.c/.h          NvM manager: queue, job state machine
+│   ├── NvM_Cfg.c/.h      NvM block table, RAM block
 │   ├── NvM_Cbk.h         Callbacks from Ea to NvM
 │   └── Std_Types.h       E_OK, E_NOT_OK, boolean
 ├── board/                Generated from the .mex file (clock, pins, LPI2C, LPUART, OSIF, eDMA)
@@ -230,10 +225,10 @@ Note: every write changes the EEPROM permanently. To see the first-boot output a
 
 | Level | Result |
 |---|---|
-| PC tests with a simulated EEPROM (`tests/ex2_host`, `tests/nvm_host`) | 43 + 48 checks passed (page splitting at 0x00, 0x05 and 0xF8; range checks; timeout; CRC; restore; reset persistence) |
+| PC tests with a simulated EEPROM (`tests/ex2_host`, `tests/nvm_host`) | 43 + 48 checks passed (page splitting at 0x00, 0x05 and 0xF8; range checks; timeout; reset persistence) |
 | Compile with ARM GCC 13.2 using the project flags and real SDK headers | Passed, 0 warnings |
 | Build with S32 Design Studio (NXP GCC 6.3.1) | **Not run yet** |
-| TC1 to TC7 on the board | **Not run yet** |
+| TC1 to TC3 on the board | **Not run yet** |
 | ST M24C04 datasheet: page size, upper-half address (0x51), write time | **Not yet confirmed** |
 
 ## 10. UART output & Test cases
@@ -252,14 +247,6 @@ The outputs below are **expected outputs built from the strings in `main.c`**, n
 
 <img width="1920" height="1080" alt="Screenshot 2026-10-14 142247" src="https://github.com/user-attachments/assets/e9824f89-1bb7-4434-a369-feadee4ba183" />
 
-
-### 10.4 Screenshots
-
-| Test | Screenshot |
-|---|---|
-| TC1 start-up read | `images/tc1_startup.png` (to be added) |
-| TC2 write and verify | `images/tc2_verify.png` (to be added) |
-| TC3 after reset | `images/tc3_reset.png` (to be added) |
 
 ## 11. Code overview
 
@@ -280,7 +267,6 @@ The outputs below are **expected outputs built from the strings in `main.c`**, n
 | Ea.c | `Ea_Init()`, `Ea_Read()`, `Ea_Write()`, `Ea_MainFunction()` | Block table check, job acceptance, job execution, callback to NvM |
 | MemIf.c | `MemIf_Read/Write/GetStatus/GetJobResult()` | Forward to Ea (device 0) |
 | NvM.c | `NvM_Init()`, `NvM_WriteBlock()`, `NvM_ReadBlock()`, `NvM_GetErrorStatus()`, `NvM_SetRamBlockStatus()`, `NvM_MainFunction()` | Block API, queue and job state machine |
-| NvM.c | `NvM_Crc16()` | CRC-16/CCITT-FALSE (polynomial 0x1021, initial 0xFFFF) for blocks with CRC |
 
 ### UART message reference
 
@@ -301,7 +287,7 @@ The outputs below are **expected outputs built from the strings in `main.c`**, n
 
 | Limitation | Possible improvement |
 |---|---|
-| Block 1 has no CRC and a single copy: a blank or corrupt value reads as valid, and a power cut during a write can leave mixed old and new bytes | Use a CRC block, or add dual-slot storage with sequence numbers |
+| Block 1 has a single copy and no integrity check: a blank or corrupt value reads as valid, and a power cut during a write can leave mixed old and new bytes | Add an integrity check, or dual-slot storage with sequence numbers |
 | Page size, upper-half address (0x51) and write time are assumptions until the ST M24C04 datasheet is checked | Confirm in the datasheet and adjust `EEPROM_PAGE_SIZE` / `EEPROM_ACK_POLL_MAX` |
 | Not yet built in S32DS or tested on the board | Run the steps in `doc_ex2/BUILD_GUIDE.md` and `doc_ex2/HW_TEST.md` |
 | `NvM_Init` failure is not reported to the application | Return a status that `main()` checks |
@@ -319,3 +305,4 @@ The outputs below are **expected outputs built from the strings in `main.c`**, n
 | 2 | JAYANTH S S|
 | 3 | VIGNESH D |
 | Institution | Saveetha Engineering College (Anna University), Electrical and Electronics Engineering |
+
