@@ -2,7 +2,7 @@
 
 **Embedded C | S32 Design Studio | I2C EEPROM (24C04) | NvM / MemIf / Ea | UART**
 
-A small embedded project that stores a **20-byte variable** in an external 24C04 EEPROM with **one API call**. The write is split into 8-byte page writes inside the driver, each page is confirmed by ACK polling, and the data is read back and compared. The value survives a reset: at start-up the program reads it back and prints it over UART, so every step can be watched in a terminal such as PuTTY.
+A small embedded project that stores a 20-byte variable in an external 24C04 EEPROM with one API call. The write is split into 8-byte page writes inside the driver, each page is confirmed by ACK polling, and the data is read back and compared. The value survives a reset: at start-up the program reads it back and prints it over UART, so every step can be watched in a terminal such as PuTTY.
 
 
 ## Table of contents
@@ -25,7 +25,7 @@ A small embedded project that stores a **20-byte variable** in an external 24C04
 
 ## 1. What this project does
 
-A 24C04 EEPROM can only be written in small **pages** (8 bytes are used in this project). A 20-byte variable is therefore longer than one page and must be written in several pieces. The application should not have to know this.
+A 24C04 EEPROM can only be written in small pages (8 bytes are used in this project). A 20-byte variable is therefore longer than one page and must be written in several pieces. The application should not have to know this.
 
 In this project:
 
