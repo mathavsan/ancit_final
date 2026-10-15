@@ -1,3 +1,18 @@
+```
+step 1 : Build & Debug the project in S32 Design Studio.
+
+step 2 : Open PuTTY beside S32 Design Studio.
+
+step 3 : Run the firmware and view the prompt in PuTTY.
+
+step 4 : Enter 20 bytes in hexadecimal and press Enter.
+
+step 5 : Store the data in EEPROM and confirm write success.
+
+step 6 : Power off and reconnect the board, then press Reset.
+
+step 7 : Read the EEPROM and verify that the stored data matches the original input.
+```
 # EEPROM Multi-Page Variable with NvM Storage Stack
 
 **Embedded C | S32 Design Studio | I2C EEPROM (24C04) | NvM / MemIf / Ea | UART**
