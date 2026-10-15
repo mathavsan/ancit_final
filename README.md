@@ -10,7 +10,7 @@ step 4 : Enter 20 bytes in hexadecimal and press Enter.
 step 5 : Store the data in EEPROM and confirm write success.
 
 step 6 : Power off and reconnect the board, then press Reset.
-
+(Reset act as a button what show the eeprom memory)
 step 7 : Read the EEPROM and verify that the stored data matches the original input.
 ```
 # EEPROM Multi-Page Variable with NvM Storage Stack
